@@ -9,5 +9,6 @@
         "--line-length",
         "100"
     ],
-    "editor.formatOnSave": true
+    "editor.formatOnSave": true,
+    "python.pythonPath": "/home/jaehyeon/.local/share/virtualenvs/airflow-lambda-wenJK2NR/bin/python"
 }

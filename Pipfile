@@ -8,8 +8,8 @@ black = "*"
 pylint = "*"
 
 [packages]
-apache-airflow = "*"
 boto3 = "*"
+apache-airflow = "*"
 
 [requires]
 python_version = "3.7"
