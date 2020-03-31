@@ -1,0 +1,39 @@
+Parameters:
+  FunctionName:
+    Type: String
+Resources:
+  AirflowLambdaLogGroup: 
+    Type: AWS::Logs::LogGroup
+    Properties:
+        LogGroupName: !Sub '/airflow/lambda/${FunctionName}'
+        RetentionInDays: 365
+  LambdaFunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole      
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties: 
+      Description: Airflow Lambda Operator test function
+      FunctionName: !Ref FunctionName
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaFunctionExecutionRole.Arn
+      Runtime: python3.7
+      Timeout: 30
+      MemorySize: 128
+      Code: 
+        ZipFile: |
+          import boto3
+          
+          def lambda_handler(event, context):
+              print('success')
