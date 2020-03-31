@@ -9,6 +9,11 @@
         "--line-length",
         "100"
     ],
+    "[yaml]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.detectIndentation": false
+    },
     "editor.formatOnSave": true,
     "python.pythonPath": "/home/jaehyeon/.local/share/virtualenvs/airflow-lambda-wenJK2NR/bin/python"
 }
