@@ -29,11 +29,54 @@ Resources:
       Handler: index.lambda_handler
       Role: !GetAtt LambdaFunctionExecutionRole.Arn
       Runtime: python3.7
-      Timeout: 30
+      Timeout: 20
       MemorySize: 128
       Code: 
         ZipFile: |
           import boto3
+          from botocore import exceptions
+          
+          logs = boto3.client("logs")
+          
+          
+          def has_log_group(prefix):
+              resp = logs.describe_log_groups(logGroupNamePrefix=prefix)
+              return len(resp["logGroups"]) > 0
+          
+          
+          def create_log_stream(group_name, stream_name):
+              is_created = True
+              try:
+                  logs.create_log_stream(logGroupName=group_name, logStreamName=stream_name)
+              except exceptions.ClientError as e:
+                  codes = [
+                      "InvalidParameterException",
+                      "ResourceAlreadyExistsException",
+                      "ResourceNotFoundException",
+                      "ServiceUnavailableException",
+                  ]
+                  if e.response["Error"]["Code"] in codes:
+                      is_created = False
+              return is_created
+          
+          
+          def delete_log_stream(group_name, stream_name):
+              is_deleted = True
+              try:
+                  logs.delete_log_stream(
+                      logGroupName=group_name, logStreamName=stream_name,
+                  )
+              except exceptions.ClientError as e:
+                  # ResourceNotFoundException is ok
+                  codes = [
+                      "InvalidParameterException",
+                      "OperationAbortedException",
+                      "ServiceUnavailableException",
+                  ]
+                  if e.response["Error"]["Code"] in codes:
+                      is_deleted = False
+              return is_deleted
+          
           
           def lambda_handler(event, context):
-              print('success')
+              print("success")
