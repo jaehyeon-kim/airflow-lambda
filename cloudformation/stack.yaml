@@ -2,6 +2,15 @@ Parameters:
   FunctionName:
     Type: String
 Resources:
+  AirflowLogBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Sub "airflow-lambda-logs"
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
   AirflowLambdaLogGroup: 
     Type: AWS::Logs::LogGroup
     Properties:

@@ -29,10 +29,12 @@ services:
     ports:
       - 8080:8080
     environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__LOGGING_LEVEL=INFO
       - AIRFLOW__CORE__FERNET_KEY=Gg3ELN1gITETZAbBQpLDBI1y2P0d7gHLe_7FwcDjmKc=
       - AIRFLOW__CORE__REMOTE_LOGGING=True
-      - AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://airflow-log-local
+      - AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://airflow-lambda-logs
       - AIRFLOW__CORE__ENCRYPT_S3_LOGS=True
       - POSTGRES_HOST=postgres
       - POSTGRES_USER=airflow
@@ -62,10 +64,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock # for DockerOperator
       - ./custom:/usr/local/airflow/custom
     environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
       - AIRFLOW__CORE__LOGGING_LEVEL=INFO
       - AIRFLOW__CORE__FERNET_KEY=Gg3ELN1gITETZAbBQpLDBI1y2P0d7gHLe_7FwcDjmKc=
       - AIRFLOW__CORE__REMOTE_LOGGING=True
-      - AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://airflow-log-local
+      - AIRFLOW__CORE__REMOTE_BASE_LOG_FOLDER=s3://airflow-lambda-logs
       - AIRFLOW__CORE__ENCRYPT_S3_LOGS=True
       - POSTGRES_HOST=postgres
       - POSTGRES_USER=airflow
