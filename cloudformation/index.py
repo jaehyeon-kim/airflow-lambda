@@ -1,4 +1,5 @@
 import time
+import re
 import logging
 import boto3
 from botocore import exceptions
@@ -7,38 +8,72 @@ from functools import wraps, update_wrapper
 
 stream = StringIO()
 logger = logging.getLogger()
-handler = logging.StreamHandler(stream)
+log_handler = logging.StreamHandler(stream)
 formatter = logging.Formatter(
     "[%(levelname)-8s] %(asctime)-s %(name)-12s %(message)s", "%Y-%m-%dT%H:%M:%SZ"
 )
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+log_handler.setFormatter(formatter)
+logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
 
-
-# def lambda_handler(event, context):
-#     for i in range(5):
-#         if i != 3:
-#             logger.info(i)
-#         else:
-#             logger.critical(i)
-#         time.sleep(1)
-#     for m in stream.getvalue().split("\n"):
-#         print(m)
+cwlogs = boto3.client("logs")
 
 
-# lambda_handler({}, {})
+class CustomLogManager(object):
+    def __init__(self, event):
+        self.group_name = event["group_name"]
+        self.stream_name = event["stream_name"]
 
-# cwlogs = boto3.client("logs")
+    def has_log_group(self):
+        group_exists = True
+        try:
+            resp = cwlogs.describe_log_groups(logGroupNamePrefix=self.group_name)
+            group_exists = len(resp["logGroups"]) > 0
+        except exceptions.ClientError as e:
+            logger.error(e.response["Error"]["Code"])
+            group_exists = False
+        return group_exists
+
+    def create_log_stream(self):
+        is_created = True
+        try:
+            cwlogs.create_log_stream(logGroupName=self.group_name, logStreamName=self.stream_name)
+        except exceptions.ClientError as e:
+            logger.error(e.response["Error"]["Code"])
+            is_created = False
+        return is_created
+
+    def delete_log_stream(self):
+        is_deleted = True
+        try:
+            cwlogs.delete_log_stream(logGroupName=self.group_name, logStreamName=self.stream_name)
+        except exceptions.ClientError as e:
+            # ResourceNotFoundException is ok
+            codes = [
+                "InvalidParameterException",
+                "OperationAbortedException",
+                "ServiceUnavailableException",
+            ]
+            if e.response["Error"]["Code"] in codes:
+                logger.error(e.response["Error"]["Code"])
+                is_deleted = False
+        return is_deleted
+
+    def is_stream_ready(self):
+        if not all([self.has_log_group(), self.delete_log_stream(), self.create_log_stream()]):
+            raise Exception("Fails to create log stream")
+        logger.info("Log stream created")
 
 
-class CustomLogHandler(object):
+class LambdaDecorator(object):
     def __init__(self, handler):
         update_wrapper(self, handler)
         self.handler = handler
 
     def __call__(self, event, context):
         try:
+            self.event = event
+            self.log_manager = CustomLogManager(event)
             return self.after(self.handler(*self.before(event, context)))
         except Exception as exception:
             return self.on_exception(exception)
@@ -48,17 +83,43 @@ class CustomLogHandler(object):
         return event, context
 
     def after(self, retval):
+        print(self.event)
         print("retval: ", retval)
         return retval
 
     def on_exception(self, exception):
-        return {"statusCode": 500, "body": "uh oh, you broke it"}
+        return exception
 
 
-@CustomLogHandler
+@LambdaDecorator
 def lambda_handler(event, context):
+    for i in range(3):
+        logger.info(i)
+    for m in stream.getvalue().split("\n"):
+        print(m)
     print("hello")
-    raise Exception
+
+
+event = {
+    "group_name": "/airflow/lambda/airflow-test",
+    "stream_name": "2020/04/01/[$LATEST]bc53f53f28ab4fc2882d86386201f70f",
+    "fail_at": "10",
+}
+print(lambda_handler(event, {}))
+
+from datetime import datetime
+import re
+
+# m = "[INFO    ] 2020-04-01T06:51:38Z root         0"
+# match = re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", m)
+# match.group()
+
+
+def get_timestamp(m):
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    match = re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", m)
+    dt_str = match.group() if match else datetime.utcnow().strftime(fmt)
+    return int(datetime.strptime(dt_str, fmt).timestamp())
 
 
 # def has_log_group(prefix):
