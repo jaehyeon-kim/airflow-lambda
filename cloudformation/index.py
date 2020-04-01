@@ -5,7 +5,7 @@ import boto3
 from datetime import datetime
 from botocore import exceptions
 from io import StringIO
-from functools import wraps, update_wrapper
+from functools import update_wrapper
 
 stream = StringIO()
 logger = logging.getLogger()
