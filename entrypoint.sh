@@ -9,8 +9,6 @@ TRY_LOOP="20"
 : "${POSTGRES_DB:="airflow"}"
 : "${AIRFLOW_HOME:="/usr/local/airflow"}"
 
-export AIRFLOW__CORE__EXECUTOR="LocalExecutor"
-export AIRFLOW__CORE__LOAD_EXAMPLES="False"
 export AIRFLOW__CORE__SQL_ALCHEMY_CONN="postgresql+psycopg2://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_HOST:$POSTGRES_PORT/$POSTGRES_DB"
 
 # Install custom python package if requirements.txt is present
