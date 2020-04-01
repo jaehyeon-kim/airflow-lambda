@@ -83,8 +83,6 @@ class CustomLogManager(object):
                 logStreamName=self.stream_name,
                 logEvents=self.create_log_events(stream),
             )
-            a = 1
-            b = 2
         except exceptions.ClientError as e:
             raise Exception("fails to put log events")
 
