@@ -82,7 +82,9 @@ class CustomLogManager(object):
                 logStreamName=self.stream_name,
                 logEvents=self.create_log_events(stream),
             )
+            logger.info(resp)
         except exceptions.ClientError as e:
+            logger.error(e)
             raise Exception("fails to put log events")
 
 
@@ -100,6 +102,8 @@ class LambdaDecorator(object):
             return self.on_exception(exception)
 
     def before(self, event, context):
+        stream.seek(0)
+        stream.truncate(0)
         self.log_manager.init_log_stream()
         logger.info("Start Request")
         return event, context
@@ -111,6 +115,7 @@ class LambdaDecorator(object):
 
     def on_exception(self, exception):
         logger.error(str(exception))
+        logger.error(traceback.format_exc())
         self.log_manager.put_log_events(stream)
         return str(exception)
 
@@ -123,13 +128,3 @@ def lambda_handler(event, context):
         else:
             raise Exception("fails at {0}".format(i))
         time.sleep(1)
-
-
-# fail_at = 3
-# event = {
-#     "group_name": "/airflow/lambda/airflow-test",
-#     "stream_name": "2020/04/01/[$LATEST]{0}".format("success" if fail_at < 0 else "fail"),
-#     "fail_at": str(fail_at),
-# }
-
-# print(lambda_handler(event, {}))
