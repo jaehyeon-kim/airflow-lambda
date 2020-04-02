@@ -52,6 +52,11 @@ class LambdaOperator(BaseOperator):
         self.log.info(
             "Log group {0}, Log stream {1}".format(self.awslogs_group, self.awslogs_stream)
         )
+        self.log.info(
+            "Payload {0}".format(
+                {k: v for k, v in self.payload.items() if k not in ["group_name", "stream_name"]}
+            )
+        )
         # invoke - wait - check
         invoke_opts = {
             "FunctionName": self.function_name,
