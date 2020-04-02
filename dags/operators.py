@@ -27,23 +27,21 @@ class LambdaOperator(BaseOperator):
         **kwargs
     ):
         super(LambdaOperator, self).__init__(**kwargs)
-
         self.function_name = function_name
         self.qualifier = qualifier
-
+        # log stream is created and added to payload
         self.awslogs_group = awslogs_group
         self.awslogs_stream = "{0}/[{1}]{2}".format(
             datetime.utcnow().strftime("%Y/%m/%d"),
             self.qualifier,
             re.sub("-", "", str(uuid.uuid4())),
         )
-
         self.payload = json.dumps(
             {**{"group_name": self.awslogs_group, "stream_name": self.awslogs_stream}, **payload,}
         )
-
+        # lambda client and cloudwatch logs hook
         self.client = AwsHook(aws_conn_id=aws_conn_id).get_client_type("lambda")
-        self.log_hook = AwsLogsHook(aws_conn_id=aws_conn_id, region_name=region_name)
+        self.awslogs_hook = AwsLogsHook(aws_conn_id=aws_conn_id, region_name=region_name)
 
     def execute(self, context):
         self.log.info(
@@ -54,7 +52,7 @@ class LambdaOperator(BaseOperator):
         self.log.info(
             "Log group {0}, Log stream {1}".format(self.awslogs_group, self.awslogs_stream)
         )
-
+        # invoke - wait - check
         invoke_opts = {
             "FunctionName": self.function_name,
             "Qualifier": self.qualifier,
@@ -86,9 +84,10 @@ class LambdaOperator(BaseOperator):
         messages = []
         max_trial = 5
         current_trial = 0
+        # sometimes events are not retrieved, run for 5 times if so
         while True:
             current_trial += 1
-            for event in self.log_hook.get_log_events(self.awslogs_group, self.awslogs_stream):
+            for event in self.awslogs_hook.get_log_events(self.awslogs_group, self.awslogs_stream):
                 has_message = True
                 invocation_failed = re.search("ERROR", event["message"]) != None
                 dt = datetime.fromtimestamp(event["timestamp"] / 1000.0)

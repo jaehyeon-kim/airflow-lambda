@@ -8,6 +8,7 @@ from botocore import exceptions
 from io import StringIO
 from functools import update_wrapper
 
+# save logs to stream
 stream = StringIO()
 logger = logging.getLogger()
 log_handler = logging.StreamHandler(stream)
@@ -20,6 +21,7 @@ cwlogs = boto3.client("logs")
 
 
 class CustomLogManager(object):
+    # create log stream and send logs to it
     def __init__(self, event):
         self.group_name = event["group_name"]
         self.stream_name = event["stream_name"]
@@ -89,6 +91,8 @@ class CustomLogManager(object):
 
 
 class LambdaDecorator(object):
+    # keep functions to run before, after and on exception
+    # modified from lambda_decorators (https://lambda-decorators.readthedocs.io/en/latest/)
     def __init__(self, handler):
         update_wrapper(self, handler)
         self.handler = handler
@@ -102,20 +106,25 @@ class LambdaDecorator(object):
             return self.on_exception(exception)
 
     def before(self, event, context):
+        # remove existing logs
         stream.seek(0)
         stream.truncate(0)
+        # create log stream
         self.log_manager.init_log_stream()
         logger.info("Start Request")
         return event, context
 
     def after(self, retval):
         logger.info("End Request")
+        # send logs to stream
         self.log_manager.put_log_events(stream)
         return retval
 
     def on_exception(self, exception):
         logger.error(str(exception))
+        # log traceback
         logger.error(traceback.format_exc())
+        # send logs to stream
         self.log_manager.put_log_events(stream)
         return str(exception)
 
