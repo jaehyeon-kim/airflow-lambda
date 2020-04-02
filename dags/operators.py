@@ -1,4 +1,5 @@
 import re
+import time
 import json
 import math
 import uuid
@@ -50,6 +51,9 @@ class LambdaOperator(BaseOperator):
                 self.function_name, self.qualifier
             )
         )
+        self.log.info(
+            "Log group {0}, Log stream {1}".format(self.awslogs_group, self.awslogs_stream)
+        )
 
         invoke_opts = {
             "FunctionName": self.function_name,
@@ -77,44 +81,27 @@ class LambdaOperator(BaseOperator):
 
     def _check_success_invocation(self):
         self.log.info("Lambda Function logs output")
+        has_message = False
+        invocation_failed = False
         messages = []
-        for event in self.log_hook.get_log_events(self.awslogs_group, self.awslogs_stream):
-            dt = datetime.fromtimestamp(event["timestamp"] / 1000.0)
-            self.log.info("[{}] {}".format(dt.isoformat(), event["message"]))
-            messages.append(event["message"])
-        if any([re.search("ERROR", m) != None for m in messages]):
+        max_trial = 5
+        current_trial = 0
+        while True:
+            current_trial += 1
+            for event in self.log_hook.get_log_events(self.awslogs_group, self.awslogs_stream):
+                has_message = True
+                invocation_failed = re.search("ERROR", event["message"]) != None
+                dt = datetime.fromtimestamp(event["timestamp"] / 1000.0)
+                self.log.info("[{}] {}".format(dt.isoformat(), event["message"]))
+                messages.append(event["message"])
+            if has_message or current_trial > max_trial:
+                break
+            time.sleep(2)
+        if not has_message:
+            raise AirflowException("Fails to get log events")
+        if invocation_failed:
             raise AirflowException("Lambda Function invocation is not successful")
 
     def _get_function_timeout(self):
         resp = self.client.get_function(FunctionName=self.function_name, Qualifier=self.qualifier)
         return resp["Configuration"]["Timeout"]
-
-
-# client = AwsHook(aws_conn_id=None).get_client_type("lambda")
-# resp = client.invoke(FunctionName="foo")
-
-###### how to put traceback???
-
-# function_name = "airflow-test"
-# awslogs_group = "/airflow/lambda/airflow-test"
-
-
-# LambdaOperator(
-#     function_name=function_name,
-#     awslogs_group=awslogs_group,
-#     payload={"fail_at": 2},
-#     task_id="XXXXXXXXX",
-# ).execute({})
-
-# import re
-
-# messages = [
-#     "INFO     2020-04-02 03:29:50,913 botocore.credentials Found credentials in environment variables.",
-#     "INFO     2020-04-02 03:29:51,360 root         log stream created",
-#     "INFO     2020-04-02 03:29:51,360 root         Start Request",
-#     "INFO     2020-04-02 03:29:51,360 root         current run 0",
-#     "INFO     2020-04-02 03:29:52,362 root         current run 1",
-#     "ERROR    2020-04-02 03:29:53,363 root         fails at 2",
-# ]
-
-# any([re.search("ERROR|EXCEPTION", m) != None for m in messages])
