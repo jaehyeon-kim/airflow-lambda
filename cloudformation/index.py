@@ -1,6 +1,7 @@
 import time
 import re
 import logging
+import traceback
 import boto3
 from datetime import datetime
 from botocore import exceptions
@@ -10,9 +11,7 @@ from functools import update_wrapper
 stream = StringIO()
 logger = logging.getLogger()
 log_handler = logging.StreamHandler(stream)
-formatter = logging.Formatter(
-    "%(levelname)-8s %(asctime)-s %(name)-12s %(message)s", "%Y-%m-%dT%H:%M:%SZ"
-)
+formatter = logging.Formatter("%(levelname)-8s %(asctime)-s %(name)-12s %(message)s")
 log_handler.setFormatter(formatter)
 logger.addHandler(log_handler)
 logger.setLevel(logging.INFO)
@@ -66,10 +65,10 @@ class CustomLogManager(object):
         logger.info("log stream created")
 
     def create_log_events(self, stream):
-        fmt = "%Y-%m-%dT%H:%M:%SZ"
+        fmt = "%Y-%m-%d %H:%M:%S,%f"
         log_events = []
         for m in [s for s in stream.getvalue().split("\n") if s]:
-            match = re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", m)
+            match = re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}", m)
             dt_str = match.group() if match else datetime.utcnow().strftime(fmt)
             log_events.append(
                 {"timestamp": int(datetime.strptime(dt_str, fmt).timestamp()) * 1000, "message": m}
@@ -111,25 +110,26 @@ class LambdaDecorator(object):
         return retval
 
     def on_exception(self, exception):
-        logger.exception(exception)
+        logger.error(str(exception))
         self.log_manager.put_log_events(stream)
-        return exception
+        return str(exception)
 
 
 @LambdaDecorator
 def lambda_handler(event, context):
     for i in range(5):
-        if i != int(event["fail_at"]):
+        if i != int(event.get("fail_at", -1)):
             logger.info("current run {0}".format(i))
         else:
             raise Exception("fails at {0}".format(i))
         time.sleep(1)
 
 
+# fail_at = 3
 # event = {
 #     "group_name": "/airflow/lambda/airflow-test",
-#     "stream_name": "2020/04/01/[$LATEST]bc53f53f28ab4fc2882d86386201f70f-fail",
-#     "fail_at": "3",
+#     "stream_name": "2020/04/01/[$LATEST]{0}".format("success" if fail_at < 0 else "fail"),
+#     "fail_at": str(fail_at),
 # }
 
 # print(lambda_handler(event, {}))
