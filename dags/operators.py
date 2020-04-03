@@ -29,6 +29,7 @@ class LambdaOperator(BaseOperator):
         super(LambdaOperator, self).__init__(**kwargs)
         self.function_name = function_name
         self.qualifier = qualifier
+        self.payload = payload
         # log stream is created and added to payload
         self.awslogs_group = awslogs_group
         self.awslogs_stream = "{0}/[{1}]{2}".format(
@@ -36,33 +37,32 @@ class LambdaOperator(BaseOperator):
             self.qualifier,
             re.sub("-", "", str(uuid.uuid4())),
         )
-        self.payload = json.dumps(
-            {**{"group_name": self.awslogs_group, "stream_name": self.awslogs_stream}, **payload,}
-        )
         # lambda client and cloudwatch logs hook
         self.client = AwsHook(aws_conn_id=aws_conn_id).get_client_type("lambda")
         self.awslogs_hook = AwsLogsHook(aws_conn_id=aws_conn_id, region_name=region_name)
 
     def execute(self, context):
         self.log.info(
+            "Log group {0}, Log stream {1}".format(self.awslogs_group, self.awslogs_stream)
+        )
+        self.log.info(
             "Invoking Lambda Function - Function name: {0}, Qualifier {1}".format(
                 self.function_name, self.qualifier
             )
         )
-        self.log.info(
-            "Log group {0}, Log stream {1}".format(self.awslogs_group, self.awslogs_stream)
-        )
-        self.log.info(
-            "Payload {0}".format(
-                {k: v for k, v in self.payload.items() if k not in ["group_name", "stream_name"]}
-            )
-        )
+        self.log.info("Payload - {0}".format(self.payload))
         # invoke - wait - check
+        payload = json.dumps(
+            {
+                **{"group_name": self.awslogs_group, "stream_name": self.awslogs_stream},
+                **self.payload,
+            }
+        )
         invoke_opts = {
             "FunctionName": self.function_name,
             "Qualifier": self.qualifier,
             "InvocationType": "RequestResponse",
-            "Payload": bytes(self.payload, encoding="utf8"),
+            "Payload": bytes(payload, encoding="utf8"),
         }
         try:
             resp = self.client.invoke(**invoke_opts)
@@ -93,18 +93,17 @@ class LambdaOperator(BaseOperator):
         while True:
             current_trial += 1
             for event in self.awslogs_hook.get_log_events(self.awslogs_group, self.awslogs_stream):
-                has_message = True
-                invocation_failed = re.search("ERROR", event["message"]) != None
                 dt = datetime.fromtimestamp(event["timestamp"] / 1000.0)
                 self.log.info("[{}] {}".format(dt.isoformat(), event["message"]))
                 messages.append(event["message"])
-            if has_message or current_trial > max_trial:
+            if len(messages) > 0 or current_trial > max_trial:
                 break
             time.sleep(2)
-        if not has_message:
+        if len(messages) == 0:
             raise AirflowException("Fails to get log events")
-        if invocation_failed:
-            raise AirflowException("Lambda Function invocation is not successful")
+        for m in reversed(messages):
+            if re.search("ERROR", m) != None:
+                raise AirflowException("Lambda Function invocation is not successful")
 
     def _get_function_timeout(self):
         resp = self.client.get_function(FunctionName=self.function_name, Qualifier=self.qualifier)
