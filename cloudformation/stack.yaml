@@ -46,7 +46,7 @@ Resources:
     Properties: 
       Description: Airflow Lambda Operator test function
       FunctionName: !Ref FunctionName
-      Handler: index.lambda_handler
+      Handler: lambda_function.lambda_handler
       Role: !GetAtt LambdaFunctionExecutionRole.Arn
       Runtime: python3.7
       Timeout: 15
