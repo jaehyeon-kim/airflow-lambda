@@ -1,5 +1,6 @@
 import time
 import re
+import random
 import logging
 import traceback
 import boto3
@@ -131,8 +132,10 @@ class LambdaDecorator(object):
 
 @LambdaDecorator
 def lambda_handler(event, context):
-    for i in range(5):
-        if i != int(event.get("fail_at", -1)):
+    max_len = event.get("max_len", 6)
+    fails_at = random.randint(0, max_len * 2)
+    for i in range(max_len):
+        if i != fails_at:
             logger.info("current run {0}".format(i))
         else:
             raise Exception("fails at {0}".format(i))
