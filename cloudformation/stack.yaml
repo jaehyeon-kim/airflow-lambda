@@ -1,4 +1,8 @@
 Parameters:
+  LambdaPackageS3Bucket:
+    Type: String
+  LambdaPackageS3Key:
+    Type: String
   FunctionName:
     Type: String
 Resources:
@@ -6,7 +10,7 @@ Resources:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
     Properties:
-      BucketName: !Sub "airflow-lambda-logs"
+      BucketName: airflow-lambda-logs
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
@@ -45,12 +49,12 @@ Resources:
     Type: AWS::Lambda::Function
     Properties: 
       Description: Airflow Lambda Operator test function
+      Code: 
+        S3Bucket: !Ref LambdaPackageS3Bucket
+        S3Key: !Ref LambdaPackageS3Key
       FunctionName: !Ref FunctionName
       Handler: lambda_function.lambda_handler
       Role: !GetAtt LambdaFunctionExecutionRole.Arn
       Runtime: python3.7
       Timeout: 15
       MemorySize: 128
-      Code: 
-        ZipFile: |
-          import time
